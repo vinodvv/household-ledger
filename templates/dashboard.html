@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Household Ledger</h1>
+
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        {% if prev_month %}
+            <a href="{{ url_for('dashboard', month=prev_month) }}" style="text-decoration:none;">←</a>
+        {% endif %}
+        <form method="GET" style="display:inline;">
+            <select name="month" onchange="this.form.submit()" style="padding:6px;">
+                {% for m in months %}
+                <option value="{{ m }}" {{ "selected" if m == selected_month }}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% if next_month %}
+            <a href="{{ url_for('dashboard', month=next_month) }}" style="text-decoration:none;">→</a>
+        {% endif %}
+    </div>
+
+    <p class="subtitle">{{ month_label }}</p>
+
+    <a href="{{ url_for('add_entry') }}" style="display:inline-block; margin-bottom:16px; padding:8px 14px; background: var(--ink); color:#fff; border-radius:6px; text-decoration:none; font-size:0.85rem;">+ Add entry</a>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label">Income</div>
+            <div class="stat-value income">₹{{ "{:,.0f}".format(income) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Expenses</div>
+            <div class="stat-value expense">₹{{ "{:,.0f}".format(expense) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Net</div>
+            <div class="stat-value" style="color: {{ 'var(--moss)' if net >= 0 else 'var(--clay)' }}">
+                ₹{{ "{:,.0f}".format(net) }}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px;">
+        <div class="stat-card" style="min-width:320px; flex:1;">
+            <div class="stat-label" style="margin-bottom:10px;">Where it went — {{ month_label }}</div>
+            <canvas id="categoryChart" height="220"></canvas>
+        </div>
+        <div class="stat-card" style="min-width:320px; flex:1;">
+            <div class="stat-label" style="margin-bottom:10px;">Income vs. expenses by month</div>
+            <canvas id="trendChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th style="text-align:right">Amount</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in transactions %}
+            <tr>
+                <td>{{ t.date.strftime("%d %b %Y") }}</td>
+                <td>{{ t.description }}</td>
+                <td><span class="pill">{{ t.category }}</span></td>
+                <td class="amount {{ t.type }}">
+                    {{ '+' if t.type == 'income' else '−' }}₹{{ "{:,.0f}".format(t.amount) }}
+                </td>
+                <td style="white-space:nowrap;">
+                    <a href="{{ url_for('edit_entry', id=t.id) }}" style="margin-right:8px;">Edit</a>
+                    <form method="POST" action="{{ url_for('delete_entry', id=t.id) }}" style="display:inline;" onsubmit="return confirm('Delete this entry?')">
+                        <button type="submit" style="border:none; background:none; color: var(--clay); cursor:pointer; padding:0;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center; color: var(--ink-soft)">No entries yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script>
+        new Chart(document.getElementById("categoryChart"), {
+            type: "bar",
+            data: {
+                labels: {{ category_labels | tojson }},
+                datasets: [{
+                    label: "Expense",
+                    data: {{ category_values | tojson }},
+                    backgroundColor: "#A6472F"
+                }]
+            },
+            options: {
+                indexAxis: "y",
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+
+        new Chart(document.getElementById("trendChart"), {
+            type: "line",
+            data: {
+                labels: {{ trend_labels | tojson }},
+                datasets: [
+                    { label: "Income", data: {{ trend_income | tojson }}, borderColor: "#3F6B4C", backgroundColor: "#3F6B4C", tension: 0.2 },
+                    { label: "Expenses", data: {{ trend_expense | tojson }}, borderColor: "#A6472F", backgroundColor: "#A6472F", tension: 0.2 }
+                ]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+    </script>
+{% endblock %}

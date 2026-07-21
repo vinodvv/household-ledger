@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>{{ "Edit entry" if entry else "New entry" }}</h1>
+
+    <form method="POST" style="max-width: 420px; margin-top: 16px;">
+        <div style="margin-bottom: 12px;">
+            <label>Type</label><br>
+            <select name="type" id="type" onchange="updateCategories()" style="width:100%; padding:8px;">
+                <option value="expense" {{ "selected" if entry and entry.type == "expense" }}>Expense</option>
+                <option value="income" {{ "selected" if entry and entry.type == "income" }}>Income</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label>Date</label><br>
+            <input type="date" name="date" value="{{ entry.date if entry else today }}" style="width:100%; padding:8px;">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label>Description</label><br>
+            <input type="text" name="description" value="{{ entry.description if entry else '' }}" style="width:100%; padding:8px;">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label>Amount (₹)</label><br>
+            <input type="number" step="0.01" name="amount" value="{{ entry.amount if entry else '' }}" style="width:100%; padding:8px;">
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <label>Category</label><br>
+            <select name="category" id="category" style="width:100%; padding:8px;"></select>
+        </div>
+
+        <button type="submit" style="padding:10px 16px; background: var(--ink); color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+            {{ "Save changes" if entry else "Add entry" }}
+        </button>
+        <a href="{{ url_for('dashboard') }}" style="margin-left: 12px; color: var(--ink-soft);">Cancel</a>
+    </form>
+
+    <script>
+        const expenseCats = {{ expense_categories | tojson }};
+        const incomeCats = {{ income_categories | tojson }};
+        const currentCategory = "{{ entry.category if entry else '' }}";
+
+        function updateCategories() {
+            const type = document.getElementById("type").value;
+            const cats = type === "income" ? incomeCats : expenseCats;
+            const select = document.getElementById("category");
+            select.innerHTML = "";
+            cats.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c;
+                opt.textContent = c;
+                if (c === currentCategory) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+        updateCategories();
+    </script>
+{% endblock %}
