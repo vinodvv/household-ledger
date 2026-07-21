@@ -4,6 +4,7 @@ from datetime import datetime, date
 from sqlalchemy import extract
 from constants import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 import os
+import calendar
 
 
 def create_app():
@@ -142,6 +143,46 @@ def create_app():
         flash("Entry deleted.")
         return redirect(url_for("dashboard"))
 
+
+    @app.route("/duplicate-month", methods=["POST"])
+    def duplicate_month():
+        source_month = request.form["month"]  # e.g. "2026-08"
+        year, month = map(int, source_month.split("-"))
+
+        # figure out the next month/year
+        if month == 12:
+            target_year, target_month = year + 1, 1
+        else:
+            target_year, target_month = year, month + 1
+
+        source_tx = Transaction.query.filter(
+            extract("year", Transaction.date) == year,
+            extract("month", Transaction.date) == month
+        ).all()
+
+        if not source_tx:
+            flash("No entries found in that month to duplicate.")
+            return redirect(url_for("dashboard", month=source_month))
+
+        # clamp day to last valid day of target month (e.g. Jan 31 -> Feb 28)
+        last_day = calendar.monthrange(target_year, target_month)[1]
+
+        count = 0
+        for t in source_tx:
+            new_day = min(t.date.day, last_day)
+            db.session.add(Transaction(
+                type=t.type,
+                date=date(target_year, target_month, new_day),
+                amount=t.amount,
+                description=t.description,
+                category=t.category,
+            ))
+            count += 1
+
+        db.session.commit()
+        target_str = f"{target_year:04d}-{target_month:02d}"
+        flash(f"Duplicated {count} entries to {datetime(target_year, target_month, 1).strftime('%B %Y')}.")
+        return redirect(url_for("dashboard", month=target_str))
 
     return app
 
