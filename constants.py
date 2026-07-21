@@ -1,16 +1,18 @@
 EXPENSE_CATEGORIES = [
     "Credit Card Dues",
-    "Investment",
-    "Savings",
-    "Living Expense",
-    "Paylater",
-    "Subscription",
-    "Home Loan",
     "Education",
-    "Utilities",
+    "Home Loan",
+    "Investment",
+    "Kanjikode Property",
+    "Living Expense",
+    "Medical",
+    "Misc",
+    "Paylater",
+    "Savings",
+    "Subscription",
     "Transportation",
-    "Misc"
+    "Utilities",
 ]
 
-INCOME_CATEGORIES = ["Pension", "Kanjikode Property", "Fund Transfer"]
+INCOME_CATEGORIES = ["Pension", "Kanjikode Property", "Fund Transfer", "Salary", "Side Hustle"]
 
