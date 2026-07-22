@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from models import db, Transaction
 from datetime import datetime, date
 from sqlalchemy import extract
 from constants import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 import os
 import calendar
+import csv
+import io
 
 
 def create_app():
@@ -183,6 +185,34 @@ def create_app():
         target_str = f"{target_year:04d}-{target_month:02d}"
         flash(f"Duplicated {count} entries to {datetime(target_year, target_month, 1).strftime('%B %Y')}.")
         return redirect(url_for("dashboard", month=target_str))
+
+
+    @app.route("/export")
+    def export_csv():
+        month_str = request.args.get("month")
+        if month_str:
+            year, month = map(int, month_str.split("-"))
+        else:
+            latest = Transaction.query.order_by(Transaction.date.desc()).first()
+            today = latest.date if latest else date.today()
+            year, month = today.year, today.month
+
+        transactions = Transaction.query.filter(
+            extract("year", Transaction.date) == year,
+            extract("month", Transaction.date) == month
+        ).order_by(Transaction.date.asc()).all()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Date", "Type", "Description", "Category", "Amount"])
+        for t in transactions:writer.writerow([t.date.strftime("%d-%m-%Y"), t.type, t.description, t.category, t.amount])
+        month_label = datetime(year, month, 1).strftime("%Y-%m")
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=ledger_{month_label}.csv"}
+        )
+
 
     return app
 

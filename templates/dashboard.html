@@ -29,6 +29,10 @@
         </button>
     </form>
 
+    <a href="{{ url_for('export_csv', month=selected_month) }}" style="display:inline-block; margin-bottom:16px; margin-left:8px; padding:8px 14px; background:#fff; color: var(--ink); border: 1px solid var(--paper-line); border-radius:6px; text-decoration:none; font-size:0.85rem;">
+        ⭳ Export CSV
+    </a>
+
     <div class="stats">
         <div class="stat-card">
             <div class="stat-label">Income</div>
