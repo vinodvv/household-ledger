@@ -1,17 +1,30 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask_mail import Mail, Message
 from models import db, Transaction
 from datetime import datetime, date
 from sqlalchemy import extract
+from dotenv import load_dotenv
 from constants import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 import os
 import calendar
 import csv
 import io
 
+load_dotenv()
+
 
 def create_app():
     app = Flask(__name__)
     app.secret_key = "dev-key-change-this-later"
+    app.config["MAIL_SERVER"] = "smtp.gmail.com"
+    app.config["MAIL_PORT"] = 587
+    app.config["MAIL_USE_TLS"] = True
+    app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
+    app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
+    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER")
+
+    mail = Mail(app)
+
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(basedir, "ledger.db")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -212,6 +225,64 @@ def create_app():
             mimetype="text/csv",
             headers={"Content-Disposition": f"attachment; filename=ledger_{month_label}.csv"}
         )
+
+
+    @app.route("/email-report", methods=["POST"])
+    def email_report():
+        month_str = request.form["month"]
+        year, month = map(int, month_str.split("-"))
+
+        transactions = Transaction.query.filter(
+            extract("year", Transaction.date) == year,
+            extract("month", Transaction.date) == month
+        ).order_by(Transaction.date.asc()).all()
+
+        if not transactions:
+            flash("No entries found for that month.")
+            return redirect(url_for("dashboard", month=month_str))
+
+        income = sum(t.amount for t in transactions if t.type == "income")
+        expense = sum(t.amount for t in transactions if t.type == "expense")
+        month_label = datetime(year, month, 1).strftime("%B %Y")
+
+        # build the CSV attachment
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Date", "Type", "Description", "Category", "Amount"])
+        for t in transactions:
+            writer.writerow([
+                t.date.strftime("%d-%m-%Y"), t.type, t.description, t.category, t.amount
+            ])
+
+        recipient = os.environ.get("MAIL_RECIPIENT")
+        if not recipient:
+            flash("MAIL_RECIPIENT is not set -- check you .env file.")
+            return redirect(url_for("dashboard", month=month_str))
+
+        msg = Message(
+            subject=f"Household Ledger - {month_label}",
+            recipients=[recipient],
+            body=(
+                f"Report for {month_label}\n\n"
+                f"Income:        Rs. {income:,.0f}\n"
+                f"Expenses:    Rs. {expense:,.0f}\n"
+                f"Net:              Rs. {income - expense:,.0f}\n\n"
+                f"Full detail attached as CSV."
+            )
+        )
+        msg.attach(
+            filename=f"ledger_{month_str}.csv",
+            content_type="text/csv",
+            data=output.getvalue()
+        )
+
+        try:
+            mail.send(msg)
+            flash(f"Report for {month_label} emailed to {recipient}.")
+        except Exception as e:
+            flash(f"Failed to send email: {e}")
+
+        return redirect(url_for("dashboard", month=month_str))
 
 
     return app
